@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZX APK</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center
+        }
+        #backgroundVideo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: .5
+        }
+        .container {
+            position: relative;
+            padding: 20px;
+            z-index: 1
+        }
+        .app-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px 0
+        }
+        .app-item {
+            background: rgba(34, 34, 34, .8);
+            border-radius: 8px;
+            padding: 15px;
+            width: 250px;
+            text-align: center;
+            transition: .2s
+        }
+        .app-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, .2)
+        }
+        .app-item img {
+            max-width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px
+        }
+        .app-item a {
+            display: inline-block;
+            margin-top: 10px;
+            color: #00ccff;
+            text-decoration: none;
+            padding: 8px 15px;
+            border: 1px solid #00ccff;
+            border-radius: 5px;
+            transition: .2s
+        }
+        .app-item a:hover {
+            background: #00ccff;
+            color: black
+        }
+        .app-item a.rainbow {
+            background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet);
+            color: black
+        }
+        .heart {
+            cursor: pointer;
+            font-size: 20px;
+            margin-top: 10px
+        }
+        .heart.liked {
+            color: red
+        }
+        .buttons {
+            position: fixed;
+            bottom: 20px;
+            display: flex;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 2
+        }
+        .login-btn, .upload-btn, .background-upload-btn {
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer
+        }
+        .login-btn {
+            left: 20px
+        }
+        .upload-btn {
+            right: 20px
+        }
+        .background-upload-btn {
+            right: 140px;
+            background: #444
+        }
+        .login-btn:hover, .upload-btn:hover, .background-upload-btn:hover {
+            background: #00ccff;
+            color: black
+        }
+        #loginUI, #uploadUI, #backgroundUploadUI, #editAppModal {
+            display: none;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #222;
+            border-radius: 5px
+        }
+        #loginUI input, #uploadUI input, #backgroundUploadUI input, #editAppModal input {
+            margin: 5px;
+            padding: 8px;
+            width: 80%;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            border: none
+        }
+        #loginUI button, #uploadUI button, #backgroundUploadUI button, #editAppModal button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #00ccff;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer
+        }
+        #editAppModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #222;
+            padding: 20px;
+            z-index: 1000;
+            width: 90%;
+            max-width: 500px
+        }
+    </style>
+</head>
+<body>
+    <video id="backgroundVideo" autoplay loop muted></video>
+    <div class="container">
+        <h1>ZX APK</h1>
+        <div class="app-list"></div>
+    </div>
+    <div class="buttons">
+        <button class="login-btn" onclick="toggleUI('loginUI', true)">เข้าสู่ระบบ</button>
+        <button class="upload-btn" style="display: none;" onclick="toggleUI('uploadUI', true)">อัปโหลดเกม</button>
+        <button class="background-upload-btn" style="display: none;" onclick="toggleUI('backgroundUploadUI', true)">อัปโหลดพื้นหลัง</button>
+    </div>
+    <div id="loginUI">
+        <input type="text" id="username" placeholder="ชื่อผู้ใช้">
+        <input type="password" id="password" placeholder="รหัสผ่าน">
+        <button onclick="login()">เข้าสู่ระบบ</button>
+    </div>
+    <div id="uploadUI">
+        <input type="text" id="appName" placeholder="ชื่อแอป">
+        <input type="text" id="appVersion" placeholder="เวอร์ชันแอป">
+        <input type="file" id="appImage">
+        <input type="url" id="appLink" placeholder="ลิงก์ดาวน์โหลด">
+        <button onclick="uploadApp()">อัปโหลด</button>
+    </div>
+    <div id="backgroundUploadUI">
+        <input type="file" id="backgroundFile" accept="video/*">
+        <button onclick="uploadBackground()">อัปโหลดพื้นหลัง</button>
+    </div>
+
+    <script>
+        let isAdmin = false, 
+            apps = JSON.parse(localStorage.getItem("apps")) || [], 
+            userLikes = JSON.parse(localStorage.getItem("userLikes")) || {}, 
+            backgroundVideo = localStorage.getItem("backgroundVideo");
+
+        if (backgroundVideo) document.getElementById("backgroundVideo").src = backgroundVideo;
+        
+        apps.forEach(app => { 
+            if (!app.likes) app.likes = 0; 
+            if (!app.downloads) app.downloads = 0; 
+            if (!app.liked) app.liked = false; 
+        });
+        
+        function displayApps() {
+            const appList = document.querySelector(".app-list");
+            appList.innerHTML = '';
+            apps.sort((a, b) => b.downloads - a.downloads);
+            apps.forEach((app, index) => {
+                const appDiv = document.createElement("div");
+                appDiv.classList.add("app-item");
+                const isTopDownloaded = apps[0].downloads > 0 && app.downloads === apps[0].downloads;
+                const downloadButtonClass = isTopDownloaded ? "rainbow" : "";
+                
+                // Add edit button if admin is logged in
+                const editButton = isAdmin 
+                    ? `<button onclick="editApp(${index})" style="margin-top: 10px; background-color: #333; color: white; border: none; padding: 5px 10px; border-radius: 5px;">แก้ไข</button>` 
+                    : '';
+
+                appDiv.innerHTML = `
+                    <img src="${app.image}" alt="${app.name}">
+                    <h4>${app.name}</h4>
+                    <p>เวอร์ชัน: ${app.version}</p>
+                    <p>ดาวน์โหลด: ${app.downloads}</p>
+                    <span class="heart ${app.liked ? 'liked' : ''}" onclick="toggleLike(${index})">${app.liked ? '❤️' : '🤍'} ${app.likes}</span>
+                    <a href="${app.link}" class="${downloadButtonClass}" onclick="incrementDownload(${index})" target="_blank">ดาวน์โหลด</a>
+                    ${editButton}
+                `;
+                appList.appendChild(appDiv);
+            });
+            localStorage.setItem("apps", JSON.stringify(apps));
+        }
+
+        function editApp(index) {
+            const app = apps[index];
+            const editModal = document.createElement('div');
+            editModal.id = 'editAppModal';
+            editModal.innerHTML = `
+                <h3>แก้ไขข้อมูลแอป</h3>
+                <input type="text" id="editAppName" value="${app.name}" placeholder="ชื่อแอป">
+                <input type="text" id="editAppVersion" value="${app.version}" placeholder="เวอร์ชัน">
+                <input type="url" id="editAppLink" value="${app.link}" placeholder="ลิงก์ดาวน์โหลด">
+                <input type="file" id="editAppImage" accept="image/*">
+                <div>
+                    <button onclick="saveAppEdit(${index})">บันทึก</button>
+                    <button onclick="closeEditModal()">ยกเลิก</button>
+                </div>
+            `;
+            document.body.appendChild(editModal);
+            editModal.style.display = 'block';
+        }
+
+        function saveAppEdit(index) {
+            if (!isAdmin) {
+                alert("กรุณาเข้าสู่ระบบก่อน!");
+                return;
+            }
+
+            const newName = document.getElementById('editAppName').value;
+            const newVersion = document.getElementById('editAppVersion').value;
+            const newLink = document.getElementById('editAppLink').value;
+            const imageFile = document.getElementById('editAppImage').files[0];
+
+            if (imageFile) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    apps[index].name = newName;
+                    apps[index].version = newVersion;
+                    apps[index].link = newLink;
+                    apps[index].image = e.target.result;
+                    
+                    localStorage.setItem("apps", JSON.stringify(apps));
+                    displayApps();
+                    closeEditModal();
+                };
+                reader.readAsDataURL(imageFile);
+            } else {
+                apps[index].name = newName;
+                apps[index].version = newVersion;
+                apps[index].link = newLink;
+                
+                localStorage.setItem("apps", JSON.stringify(apps));
+                displayApps();
+                closeEditModal();
+            }
+        }
+
+        function closeEditModal() {
+            const editModal = document.getElementById('editAppModal');
+            if (editModal) {
+                editModal.remove();
+            }
+        }
+
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            if (username === "admin" && password === "admin123") {
+                isAdmin = true;
+                document.querySelector(".upload-btn").style.display = "block";
+                document.querySelector(".background-upload-btn").style.display = "block";
+                toggleUI("loginUI", false);
+                displayApps(); // Refresh apps to show edit buttons
+                alert("เข้าสู่ระบบสำเร็จ!");
+            } else {
+                alert("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง!");
+            }
+        }
+
+        function uploadApp() {
+            if (!isAdmin) { alert("กรุณาเข้าสู่ระบบก่อนอัปโหลดเกม!"); return; }
+            const reader = new FileReader();
+            const appImage = document.getElementById("appImage").files[0];
+            reader.onload = e => {
+                apps.push({
+                    name: document.getElementById("appName").value,
+                    version: document.getElementById("appVersion").value,
+                    image: e.target.result,
+                    link: document.getElementById("appLink").value,
+                    likes: 0,
+                    downloads: 0,
+                    liked: false
+                });
+                localStorage.setItem("apps", JSON.stringify(apps));
+                displayApps();
+                toggleUI("uploadUI", false);
+            };
+            reader.readAsDataURL(appImage);
+        }
+
+        function uploadBackground() {
+            if (!isAdmin) { alert("กรุณาเข้าสู่ระบบก่อน!"); return; }
+            const reader = new FileReader();
+            const backgroundFile = document.getElementById("backgroundFile").files[0];
+            reader.onload = e => {
+                const backgroundVideo = document.getElementById("backgroundVideo");
+                backgroundVideo.src = e.target.result;
+                localStorage.setItem("backgroundVideo", e.target.result);
+                toggleUI("backgroundUploadUI", false);
+                alert("อัปโหลดพื้นหลังสำเร็จ!");
+            };
+            reader.readAsDataURL(backgroundFile);
+        }
+
+        function toggleLike(index) {
+            const app = apps[index];
+            app.liked = !app.liked;
+            app.likes += app.liked ? 1 : -1;
+            userLikes[app.name] = app.liked;
+            localStorage.setItem("userLikes", JSON.stringify(userLikes));
+            displayApps();
+        }
+
+        function incrementDownload(index) {
+            apps[index].downloads++;
+            localStorage.setItem("apps", JSON.stringify(apps));
+            displayApps();
+        }
+
+        function toggleUI(uiId, show) {
+            document.getElementById(uiId).style.display = show ? 'block' : 'none';
+        }
+
+        displayApps();
+    </script>
+</body>
+</html>
